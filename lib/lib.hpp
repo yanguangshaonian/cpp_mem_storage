@@ -68,8 +68,9 @@ class SharedDataStore {
         template<typename Accesser>
         inline __attribute__((always_inline)) void dangerous_access(uint64_t idx, Accesser&& accesser) noexcept {
             auto& data_ref = data[idx];
-            auto lock_flag = data_ref.lock();
-            accesser(data_ref.value, lock_flag);
+            // 没抢到锁, 但是返回了, 说明 是有一些危险的
+            auto is_dangerous = data_ref.lock() == false;
+            accesser(data_ref.value, is_dangerous);
             data_ref.unlock();
         }
 };

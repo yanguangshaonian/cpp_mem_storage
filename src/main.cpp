@@ -24,7 +24,7 @@ int main() {
         student.age += 1;
         cout << student.age << std::endl;
     });
-    
+
     std::cout << "Hello World!" << std::endl;
     return 0;
 }
