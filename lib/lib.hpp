@@ -67,9 +67,6 @@ class SharedDataStore {
     public:
         template<typename Accesser>
         inline __attribute__((always_inline)) void dangerous_access(uint64_t idx, Accesser&& accesser) noexcept {
-            if (idx >= CNT) {
-                return;
-            }
             auto& data_ref = data[idx];
             auto lock_flag = data_ref.lock();
             accesser(data_ref.value, lock_flag);
