@@ -131,6 +131,7 @@ class MemoryStorage {
                 this_thread::sleep_for(milliseconds(1));
             }
 
+            cout << ">> [复用成功] " << this->storage_name << " attached." << endl;
             this->layout_ptr = temp_layout;
             return 0;
         }
@@ -167,12 +168,11 @@ class MemoryStorage {
         }
 
     public:
-        StoreType* build(string storage_name) {
+        void build(string storage_name) {
             this->storage_name = storage_name;
 
             if (geteuid() != 0) {
-                cerr << "Error: 需要 root 权限 (HugePage/mmap)" << endl;
-                return nullptr;
+                throw std::runtime_error("Critical Error: 需要 root 权限以使用 HugePage/mmap");
             }
 
             // 重试循环：处理并发启动时的竞争
@@ -183,26 +183,29 @@ class MemoryStorage {
                 // 复用
                 int join_ret = try_join_existing();
                 if (join_ret == 0) {
-                    cout << ">> [复用成功] " << storage_name << endl;
-                    return &(this->layout_ptr->store);
+                    return;
                 }
 
                 // 新建
                 if (try_create_new()) {
-                    return &(this->layout_ptr->store);
+                    return;
                 }
 
                 // 有些异常
                 if (errno == EEXIST) {
                     cout << ">> [并发竞争] 检测到其他进程刚刚创建了文件，重试..." << endl;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
                     continue;
                 }
 
                 // 其他错误
-                cerr << "shm_open 失败: " << strerror(errno) << endl;
-                break;
+                throw std::runtime_error("shm_open 致命错误 (" + to_string(errno) + "): " + strerror(errno));
             }
-            return nullptr;
+            throw std::runtime_error("初始化超时: " + storage_name + " 存在严重的并发启动竞争");
+        }
+
+        inline __attribute__((always_inline)) StoreType& get_store() const {
+            return this->layout_ptr->store;
         }
 
         ~MemoryStorage() {

@@ -17,10 +17,20 @@ class Student {
 
 int main() {
 
-    auto mem_storage = MemoryStorage<Student, 5000>();
-    auto shared_store = mem_storage.build("student~");
+    // auto mem_storage = MemoryStorage<Student, 5000>();
+    // auto shared_store = mem_storage.build("student~");
 
-    shared_store->dangerous_access(0, [](Student& student, bool is_dangerous) {
+    // shared_store->dangerous_access(0, [](Student& student, bool is_dangerous) {
+    //     student.age += 1;
+    //     cout << student.age << std::endl;
+    // });
+
+
+    auto mem_storage = MemoryStorage<Student, 5000>();
+    mem_storage.build("student~");
+    auto& store = mem_storage.get_store();
+
+    store.dangerous_access(0, [](Student& student, bool is_dangerous) {
         student.age += 1;
         cout << student.age << std::endl;
     });
