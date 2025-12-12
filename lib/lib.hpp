@@ -96,6 +96,7 @@ class MemoryStorage {
         void* map_memory_segment() {
             auto ptr = mmap(nullptr, layout_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_HUGETLB, this->shm_fd, 0);
             if (ptr == MAP_FAILED) {
+                cout << "mmap 大页分配错误: " << strerror(errno) << ", 尝试回退" << endl;
                 ptr = mmap(nullptr, layout_size, PROT_READ | PROT_WRITE, MAP_SHARED, this->shm_fd, 0);
             }
             return ptr;
@@ -109,6 +110,7 @@ class MemoryStorage {
 
             void* ptr = map_memory_segment();
             if (ptr == MAP_FAILED) {
+                cerr << "mmap 失败: " << strerror(errno) << endl;
                 close(this->shm_fd);
                 return -1;
             }
