@@ -61,7 +61,6 @@ class alignas(CACHE_LINE_SIZE) PaddedValue {
 template<class T, uint64_t CNT>
 class SharedDataStore {
     protected:
-        using ItemsType = PaddedValue<T>[CNT];
         alignas(CACHE_LINE_SIZE) PaddedValue<T> data[CNT];
 
     public:
