@@ -37,9 +37,9 @@ class alignas(CACHE_LINE_SIZE) PaddedValue {
             while (true) {
                 uint8_t delay = 1;
                 while (busy_flag.load(std::memory_order_relaxed)) {
-                    delay = (delay << 1) & 0xFF;
-                    // 一个循环下来, 之后强制 抢占锁
-                    if (delay == 0) {
+                    delay <<= 1;
+                    // 之后强制 抢占锁
+                    if (delay == 0xFF) {
                         return false;
                     }
                     for (auto i = 0; i < delay; ++i) {
