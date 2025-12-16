@@ -174,7 +174,8 @@ class MemoryStorage {
         }
 
     public:
-        void build(string storage_name) {
+        bool build(string storage_name) {
+            auto is_join = false;
             this->storage_name = storage_name;
 
             if (geteuid() != 0) {
@@ -189,12 +190,13 @@ class MemoryStorage {
                 // 复用
                 int join_ret = try_join_existing();
                 if (join_ret == 0) {
-                    return;
+                    is_join = true;
+                    return is_join;
                 }
 
                 // 新建
                 if (try_create_new()) {
-                    return;
+                    return is_join;
                 }
 
                 // 有些异常
