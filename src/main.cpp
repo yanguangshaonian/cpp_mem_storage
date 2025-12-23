@@ -1,5 +1,7 @@
 
 #include "lib.hpp"
+#include "iostream"
+using namespace std;
 
 class Student {
     public:
@@ -26,9 +28,9 @@ int main() {
     // });
 
 
-    auto mem_storage = MemoryStorage<Student, 5000>();
-    mem_storage.build("student~");
-    auto& store = mem_storage.get_store();
+    auto mem = mem_storage::MemoryStorage<Student, 5000>();
+    mem.build("student~");
+    auto& store = mem.get_store();
 
     store.dangerous_access(0, [](Student& student, bool is_dangerous) {
         student.age += 1;
