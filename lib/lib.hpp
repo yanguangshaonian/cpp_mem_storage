@@ -1,5 +1,5 @@
-#ifndef LIB_HPP
-#define LIB_HPP
+#ifndef MEM_STORAGE_HPP
+#define MEM_STORAGE_HPP
 #pragma pack(push)
 #pragma pack()
 
@@ -230,4 +230,4 @@ class MemoryStorage {
 };
 
 #pragma pack(pop)
-#endif //LIB_HPP
+#endif //MEM_STORAGE_HPP
