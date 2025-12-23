@@ -65,7 +65,7 @@ namespace mem_storage {
             alignas(CACHE_LINE_SIZE) PaddedValue<T> data[CNT];
 
         public:
-            template<typename Accesser>
+            template<class Accesser>
             inline __attribute__((always_inline)) void dangerous_access(uint64_t idx, Accesser&& accesser) noexcept {
                 auto& data_ref = data[idx];
                 using ValueType = decltype(data_ref.value);
