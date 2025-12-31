@@ -298,12 +298,11 @@ namespace mem_storage {
         public:
             // 返回 bool: true = 复用旧文件(Join), false = 创建新文件(Create)
             // 抛出异常: 严重错误
-            bool build(string name, uint64_t requested_count) {
+            bool build(string storage_name, uint64_t requested_count) {
                 if (geteuid() != 0) {
                     throw std::runtime_error("致命错误: 需要 Root 权限以使用 HugePage/mmap");
                 }
-
-                this->storage_name = name;
+                this->storage_name = storage_name;
 
                 for (auto i = 0; i < 3; i += 1) {
                     // 尝试 Join
