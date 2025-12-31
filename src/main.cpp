@@ -28,9 +28,9 @@ int main() {
     // });
 
 
-    auto mem = mem_storage::MemoryStorage<Student, 5000>();
-    mem.build("student~");
-    auto& store = mem.get_store();
+    auto mem = mem_storage::MemoryStorage<Student>();
+    mem.build("student~", 5000);
+    auto& store = mem.get_view();
 
     store.dangerous_access(0, [](Student& student, bool is_dangerous) {
         student.age += 1;
