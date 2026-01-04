@@ -21,7 +21,7 @@
 #include <climits>
 #include <cstdint>
 
-namespace mem_storage {
+namespace mm_storage {
     using namespace std;
     using namespace std::chrono;
 
@@ -353,7 +353,7 @@ namespace mem_storage {
                 }
             }
     };
-}; // namespace mem_storage
+}; // namespace mm_storage
 
 #pragma pack(pop)
 #endif //MEM_STORAGE_HPP
