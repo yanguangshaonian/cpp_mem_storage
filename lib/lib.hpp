@@ -93,7 +93,7 @@ namespace mem_storage {
     // ----------------------------------------------------------------
     template<class T>
     class SharedDataView {
-        protected:
+        private:
             PaddedValue<T>* data_ptr = nullptr;
 
         public:
