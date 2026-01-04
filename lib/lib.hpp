@@ -1,9 +1,8 @@
 #ifndef MEM_STORAGE_HPP
 #define MEM_STORAGE_HPP
-#include <iomanip>
 #pragma pack(push)
 #pragma pack()
-
+#include <iomanip>
 #include <chrono>
 #include <string>
 #include <sys/mman.h>
