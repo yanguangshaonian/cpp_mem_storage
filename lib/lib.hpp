@@ -35,16 +35,16 @@ namespace mem_storage {
     // 魔数
     constexpr uint64_t SHM_READY_MAGIC = 0xDEADBEEFCAFEBABE;
 
-    // ==========================================
+    // ----------------------------------------------------------------
     // 辅助工具: 向上对齐到 2MB
-    // ==========================================
+    // ----------------------------------------------------------------
     inline uint64_t align_to_huge_page(uint64_t size) {
         return (size + HUGE_PAGE_SIZE - 1) & ~(HUGE_PAGE_SIZE - 1);
     }
 
-    // ==========================================
+    // ----------------------------------------------------------------
     // 数据载体
-    // ==========================================
+    // ----------------------------------------------------------------
     template<class T>
     class alignas(CACHE_LINE_SIZE) PaddedValue {
         public:
@@ -54,16 +54,16 @@ namespace mem_storage {
             // 指数退避之后 强制抢占锁
             inline __attribute__((always_inline)) bool lock() noexcept {
                 while (true) {
-                    uint8_t delay = 1;
+                    uint8_t delay = 0b0000'0001;
                     while (busy_flag.load(std::memory_order_relaxed)) {
-                        delay <<= 1;
-                        // 之后强制 抢占锁
-                        if (delay == 0xFF) {
-                            return false;
-                        }
                         for (auto i = 0; i < delay; i += 1) {
                             asm volatile("pause" ::: "memory");
                         }
+                        // 之后强制 抢占锁
+                        if (delay == 0b1000'0000) {
+                            return false;
+                        }
+                        delay <<= 1;
                     }
 
                     if (!busy_flag.exchange(true, std::memory_order_acquire)) {
@@ -77,9 +77,9 @@ namespace mem_storage {
             }
     };
 
-    // ==========================================
+    // ----------------------------------------------------------------
     // 元数据头
-    // ==========================================
+    // ----------------------------------------------------------------
     class alignas(CACHE_LINE_SIZE) ShmHeader {
         public:
             volatile uint64_t magic_num;
@@ -88,9 +88,9 @@ namespace mem_storage {
             uint64_t aligned_file_size; // 2MB 对齐后的文件总大小 (用于 mmap)
     };
 
-    // ==========================================
+    // ----------------------------------------------------------------
     // 视图 (View)
-    // ==========================================
+    // ----------------------------------------------------------------
     template<class T>
     class SharedDataView {
         protected:
@@ -118,9 +118,9 @@ namespace mem_storage {
             }
     };
 
-    // ==========================================
+    // ----------------------------------------------------------------
     // 存储管理器
-    // ==========================================
+    // ----------------------------------------------------------------
     template<class T>
     class MemoryStorage {
         private:
@@ -214,10 +214,8 @@ namespace mem_storage {
                     return JoinResult::TYPE_MISMATCH;
                 }
 
-                // 解除临时映射
+                // 解除临时映射, 然后完整映射
                 munmap(temp_ptr, MIN_MAP_SIZE);
-
-                // 完整映射
                 this->mapped_ptr = map_memory_segment(file_aligned_size, true);
 
                 // 容错降级: 如果 HugePage 失败, 回退到普通页
@@ -276,7 +274,6 @@ namespace mem_storage {
                 this->mapped_size = aligned_sz;
 
                 // 初始化 Header
-                // 使用 placement new 初始化 header 区域
                 auto header = new (this->mapped_ptr) ShmHeader();
                 header->element_count = count;
                 header->element_size = sizeof(T);
