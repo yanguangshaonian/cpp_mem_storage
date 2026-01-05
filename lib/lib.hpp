@@ -208,14 +208,18 @@ namespace mem_storage {
                 auto elem_sz = header->element_size;
 
                 if (elem_sz != sizeof(T)) {
-                    log_msg("FATAL", "类型大小不匹配! 文件: " + to_string(elem_sz) + ", 本地: " + to_string(sizeof(T)));
+                    log_msg("ERROR", "共享内存数据结构不匹配:\n"
+                                     "  文件中 element_size = " +
+                                         to_string(elem_sz) + "\n  本地 sizeof(T)     = " + to_string(sizeof(T)));
                     munmap(temp_ptr, MIN_MAP_SIZE);
                     close(this->shm_fd);
                     return JoinResult::TYPE_MISMATCH;
                 }
                 if (header->padded_element_size != sizeof(PaddedValue<T, ALIGN>)) {
-                    log_msg("FATAL", "填充大小不匹配! 文件: " + to_string(header->padded_element_size) +
-                                         ", 本地: " + to_string(sizeof(PaddedValue<T, ALIGN>)));
+                    log_msg("ERROR", "共享内存填充结构不匹配:\n"
+                                     "  文件中 padded_size = " +
+                                         to_string(header->padded_element_size) +
+                                         "\n  本地 padded_size   = " + to_string(sizeof(PaddedValue<T, ALIGN>)));
                     munmap(temp_ptr, MIN_MAP_SIZE);
                     close(this->shm_fd);
                     return JoinResult::TYPE_MISMATCH;
@@ -240,7 +244,7 @@ namespace mem_storage {
                 this->view.init(this->mapped_ptr);
 
                 stringstream ss;
-                ss << "复用成功。数量: " << elem_cnt << ", 占用空间: " << (file_aligned_size / 1024 / 1024) << " MB";
+                ss << "复用成功, 数量: " << elem_cnt << ", 占用空间: " << (file_aligned_size / 1024 / 1024) << " MB";
                 log_msg("INFO", ss.str());
 
                 return JoinResult::SUCCESS;
@@ -255,9 +259,41 @@ namespace mem_storage {
                     return false;
                 }
 
-                // 计算对齐后的大小
-                auto raw_size = sizeof(ShmHeader) + sizeof(PaddedValue<T, ALIGN>) * count;
-                auto aligned_sz = align_to_huge_page(raw_size);
+                // 计算各种大小
+                const size_t header_sz = sizeof(ShmHeader);
+                const size_t elem_sz = sizeof(T);
+                const size_t padded_sz = sizeof(PaddedValue<T, ALIGN>);
+
+                const size_t raw_data_sz = padded_sz * count;
+                const size_t raw_total_sz = header_sz + raw_data_sz;
+                const size_t aligned_sz = align_to_huge_page(raw_total_sz);
+                const size_t waste_sz = aligned_sz - raw_total_sz;
+
+
+                {
+                    stringstream ss;
+                    ss << "开始创建共享内存:\n"
+                       << "  名称            = " << this->storage_name << "\n"
+                       << "  请求元素数量    = " << count << "\n"
+                       << "  sizeof(T)       = " << elem_sz << " 字节\n"
+                       << "  sizeof(Padded)  = " << padded_sz << " 字节\n"
+                       << "  alignof(T)      = " << alignof(T) << "\n"
+                       << "  alignof(Padded) = " << alignof(PaddedValue<T, ALIGN>);
+                    log_msg("INFO", ss.str());
+                }
+
+                {
+                    stringstream ss;
+                    ss << "共享内存布局计算:\n"
+                       << "  Header 大小        = " << header_sz << " 字节\n"
+                       << "  数据区原始大小    = " << raw_data_sz << " 字节\n"
+                       << "  原始总大小        = " << raw_total_sz << " 字节\n"
+                       << "  对齐规则          = HugePage (2MB)\n"
+                       << "  对齐后总大小      = " << aligned_sz << " 字节\n"
+                       << "  对齐浪费空间      = " << waste_sz << " 字节 (" << std::fixed << std::setprecision(2)
+                       << (100.0 * waste_sz / aligned_sz) << "%)";
+                    log_msg("INFO", ss.str());
+                }
 
                 if (ftruncate(this->shm_fd, aligned_sz) == -1) {
                     log_msg("ERROR", "ftruncate 失败: " + string(strerror(errno)));
@@ -283,9 +319,10 @@ namespace mem_storage {
                 // 初始化 Header
                 auto header = new (this->mapped_ptr) ShmHeader();
                 header->element_count = count;
-                header->element_size = sizeof(T);
-                header->padded_element_size = sizeof(PaddedValue<T, ALIGN>);
+                header->element_size = elem_sz;
+                header->padded_element_size = padded_sz;
                 header->aligned_file_size = aligned_sz;
+
 
                 // 内存屏障, 确保数据写入后再设置 Magic
                 std::atomic_thread_fence(std::memory_order_release);
@@ -293,10 +330,12 @@ namespace mem_storage {
 
                 this->view.init(this->mapped_ptr);
 
-                stringstream ss;
-                ss << "创建成功。请求数量: " << count << ", 对齐后大小: " << (aligned_sz / 1024 / 1024) << " MB";
-                log_msg("INFO", ss.str());
-
+                {
+                    stringstream ss;
+                    ss << "共享内存映射完成:\n"
+                       << "  映射总大小        = " << aligned_sz << " 字节 (" << (aligned_sz / 1024 / 1024) << " MB)";
+                    log_msg("INFO", ss.str());
+                }
                 return true;
             }
 
