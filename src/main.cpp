@@ -28,7 +28,7 @@ int main() {
     // });
 
 
-    auto mm = mm_storage::MemoryStorage<Student>();
+    auto mm = mem_storage::MemoryStorage<Student>();
     mm.build("student~", 3000);
     auto& store = mm.get_view();
 
