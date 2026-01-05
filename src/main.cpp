@@ -5,7 +5,7 @@ using namespace std;
 
 class Student {
     public:
-        char name[66]{};
+        char name[3]{};
         uint32_t age;
 
         Student() = default;
@@ -13,7 +13,6 @@ class Student {
         explicit Student(const uint32_t age)
             : age(age) {
             name[0] = '1';
-            name[65] = '\n';
         }
 };
 
@@ -28,8 +27,8 @@ int main() {
     // });
 
 
-    auto mm = mem_storage::MemoryStorage<Student>();
-    mm.build("student~", 3000);
+    auto mm = mem_storage::MemoryStorage<Student, 8>();
+    mm.build("student~", 300000);
     auto& store = mm.get_view();
 
     store.dangerous_access(0, [](Student& student, bool is_dangerous) {

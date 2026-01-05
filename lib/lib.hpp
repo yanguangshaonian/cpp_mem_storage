@@ -44,11 +44,11 @@ namespace mem_storage {
     // ----------------------------------------------------------------
     // 数据载体
     // ----------------------------------------------------------------
-    template<class T>
-    class alignas(CACHE_LINE_SIZE) PaddedValue {
+    template<class T, size_t ALIGN = CACHE_LINE_SIZE>
+    class alignas(ALIGN) PaddedValue {
         public:
-            std::atomic<bool> busy_flag = false;
             T value;
+            std::atomic<bool> busy_flag = false;
 
             // 指数退避之后 强制抢占锁
             inline __attribute__((always_inline)) bool lock() noexcept {
@@ -82,22 +82,23 @@ namespace mem_storage {
     class alignas(CACHE_LINE_SIZE) ShmHeader {
         public:
             volatile uint64_t magic_num;
-            uint64_t element_count;     // 逻辑元素数量
-            uint64_t element_size;      // 单个元素大小
-            uint64_t aligned_file_size; // 2MB 对齐后的文件总大小 (用于 mmap)
+            uint64_t element_count;       // 逻辑元素数量
+            uint64_t element_size;        // 单个元素大小
+            uint64_t padded_element_size; // 填充后的元素大小
+            uint64_t aligned_file_size;   // 2MB 对齐后的文件总大小 (用于 mmap)
     };
 
     // ----------------------------------------------------------------
     // 视图 (View)
     // ----------------------------------------------------------------
-    template<class T>
+    template<class T, size_t ALIGN = CACHE_LINE_SIZE>
     class SharedDataView {
         private:
-            PaddedValue<T>* data_ptr = nullptr;
+            PaddedValue<T, ALIGN>* data_ptr = nullptr;
 
         public:
             void init(uint8_t* base_addr) {
-                data_ptr = reinterpret_cast<PaddedValue<T>*>(base_addr + sizeof(ShmHeader));
+                data_ptr = reinterpret_cast<PaddedValue<T, ALIGN>*>(base_addr + sizeof(ShmHeader));
             }
 
             template<class Accesser>
@@ -120,7 +121,7 @@ namespace mem_storage {
     // ----------------------------------------------------------------
     // 存储管理器
     // ----------------------------------------------------------------
-    template<class T>
+    template<class T, size_t ALIGN = CACHE_LINE_SIZE>
     class MemoryStorage {
         private:
             enum class JoinResult {
@@ -132,7 +133,7 @@ namespace mem_storage {
             };
 
             string storage_name;
-            SharedDataView<T> view;
+            SharedDataView<T, ALIGN> view;
 
             // 资源的信息, 析构时候用
             int32_t shm_fd = -1;
@@ -212,6 +213,13 @@ namespace mem_storage {
                     close(this->shm_fd);
                     return JoinResult::TYPE_MISMATCH;
                 }
+                if (header->padded_element_size != sizeof(PaddedValue<T, ALIGN>)) {
+                    log_msg("FATAL", "填充大小不匹配! 文件: " + to_string(header->padded_element_size) +
+                                         ", 本地: " + to_string(sizeof(PaddedValue<T, ALIGN>)));
+                    munmap(temp_ptr, MIN_MAP_SIZE);
+                    close(this->shm_fd);
+                    return JoinResult::TYPE_MISMATCH;
+                }
 
                 // 解除临时映射, 然后完整映射
                 munmap(temp_ptr, MIN_MAP_SIZE);
@@ -248,7 +256,7 @@ namespace mem_storage {
                 }
 
                 // 计算对齐后的大小
-                auto raw_size = sizeof(ShmHeader) + sizeof(PaddedValue<T>) * count;
+                auto raw_size = sizeof(ShmHeader) + sizeof(PaddedValue<T, ALIGN>) * count;
                 auto aligned_sz = align_to_huge_page(raw_size);
 
                 if (ftruncate(this->shm_fd, aligned_sz) == -1) {
@@ -276,6 +284,7 @@ namespace mem_storage {
                 auto header = new (this->mapped_ptr) ShmHeader();
                 header->element_count = count;
                 header->element_size = sizeof(T);
+                header->padded_element_size = sizeof(PaddedValue<T, ALIGN>);
                 header->aligned_file_size = aligned_sz;
 
                 // 内存屏障, 确保数据写入后再设置 Magic
@@ -338,7 +347,7 @@ namespace mem_storage {
                 throw std::runtime_error("由于严重的并发竞争，初始化超时");
             }
 
-            inline SharedDataView<T>& get_view() {
+            inline SharedDataView<T, ALIGN>& get_view() {
                 return this->view;
             }
 
