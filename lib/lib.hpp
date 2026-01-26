@@ -51,18 +51,24 @@ namespace mem_storage {
             std::atomic<bool> busy_flag = false;
 
             // 指数退避之后 强制抢占锁
-            inline __attribute__((always_inline)) bool lock() noexcept {
+            // allow_fail == true: 达到最大退避后允许失败返回
+            // allow_fail == false: 无限自旋直到获取锁
+            inline __attribute__((always_inline)) bool lock(bool allow_fail=true) noexcept {
                 while (true) {
                     uint8_t delay = 0b0000'0001;
                     while (busy_flag.load(std::memory_order_relaxed)) {
                         for (auto i = 0; i < delay; i += 1) {
                             asm volatile("pause" ::: "memory");
                         }
-                        // 之后强制 抢占锁
-                        if (delay == 0b1000'0000) {
-                            return false;
+
+                        if (delay < 0b1000'0000) {
+                            delay <<= 1;
+                        } else {
+                            // 已达到最大退避
+                            if (allow_fail) {
+                                return false;
+                            }
                         }
-                        delay <<= 1;
                     }
 
                     if (!busy_flag.exchange(true, std::memory_order_acquire)) {
@@ -105,16 +111,26 @@ namespace mem_storage {
             inline __attribute__((always_inline)) void dangerous_access(uint64_t idx, Accesser&& accesser) noexcept {
                 auto& data_ref = data_ptr[idx];
                 using ValueType = decltype(data_ref.value);
+                
+                bool locked = data_ref.lock();   // 是否真正持锁
+                bool is_dangerous = locked == false;
+
                 if constexpr (std::is_invocable_v<Accesser, ValueType&, bool>) {
-                    // 没抢到锁, 但是返回了, 说明 是有一些危险的
-                    bool is_dangerous = (data_ref.lock() == false);
                     accesser(data_ref.value, is_dangerous);
-                    data_ref.unlock();
                 } else {
-                    data_ref.lock();
                     accesser(data_ref.value);
+                }
+
+                if (locked) {
                     data_ref.unlock();
                 }
+            }
+            template<class Accesser>
+            inline __attribute__((always_inline)) void access(uint64_t idx, Accesser&& accesser) noexcept {
+                auto& data_ref = data_ptr[idx];
+                data_ref.lock(false);
+                accesser(data_ref.value);
+                data_ref.unlock();
             }
     };
 
