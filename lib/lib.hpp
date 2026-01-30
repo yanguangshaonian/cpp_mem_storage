@@ -108,7 +108,7 @@ namespace mem_storage {
             }
 
             template<class Accesser>
-            inline __attribute__((always_inline)) void dangerous_access(uint64_t idx, Accesser&& accesser) noexcept {
+            inline __attribute__((always_inline)) void try_locked_access(uint64_t idx, Accesser&& accesser) noexcept {
                 auto& data_ref = data_ptr[idx];
                 using ValueType = decltype(data_ref.value);
                 
@@ -126,12 +126,18 @@ namespace mem_storage {
                 }
             }
             template<class Accesser>
-            inline __attribute__((always_inline)) void access(uint64_t idx, Accesser&& accesser) noexcept {
+            inline __attribute__((always_inline)) void locked_access(uint64_t idx, Accesser&& accesser) noexcept {
                 auto& data_ref = data_ptr[idx];
                 data_ref.lock(false);
                 accesser(data_ref.value);
                 data_ref.unlock();
             }
+
+            template<class Accesser>
+            inline __attribute__((always_inline)) void raw_access(uint64_t idx, Accesser&& accesser) noexcept {
+                accesser(data_ptr[idx].value);
+            }
+            
     };
 
     // ----------------------------------------------------------------

@@ -31,7 +31,7 @@ int main() {
     mm.build("student~", 300000);
     auto& store = mm.get_view();
 
-    store.dangerous_access(0, [](Student& student, bool is_dangerous) {
+    store.try_locked_access(0, [](Student& student, bool is_dangerous) {
         student.age += 1;
         cout << student.age << std::endl;
     });
